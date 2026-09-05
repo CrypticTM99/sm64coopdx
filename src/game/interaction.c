@@ -1575,7 +1575,79 @@ u32 interact_player_pvp(struct MarioState* attacker, struct MarioState* victim) 
         if (attacker->actionState == 0) { return FALSE; }
         victim->bounceSquishTimer = max(victim->bounceSquishTimer, 20);
     }
+    //Manually trigger a PvP attack from Lua / custom hitboxes
+ 
+bool trigger_pvp_attack(struct MarioState *attacker, struct MarioState *victim, u32 interaction) {
+    if (!attacker || !victim) { return false; }
+    if (!is_player_active(attacker) || !is_player_active(victim)) { return false; }
+    if (gServerSettings.playerInteractions == PLAYER_INTERACTIONS_NONE) { return false; }
+    if (attacker->action == ACT_JUMBO_STAR_CUTSCENE || victim->action == ACT_JUMBO_STAR_CUTSCENE) { return false; }
 
+    // Vanish cap
+    u32 vanishFlags = (MARIO_VANISH_CAP | MARIO_CAP_ON_HEAD);
+    if ((attacker->flags & vanishFlags) == vanishFlags) { return false; }
+    if ((victim->flags   & vanishFlags) == vanishFlags) { return false; }
+
+    // Level load grace
+    if (gCurrentArea == NULL || gCurrentArea->localAreaTimer < 60) { return false; }
+
+    // Basic PvP checks
+    if (!passes_pvp_interaction_checks(attacker, victim)) { return false; }
+
+    // Use lag-compensated victim for local player
+    struct MarioState *cVictim = NULL;
+    if (victim->playerIndex == 0) {
+        cVictim = lag_compensation_get_local_state(&gNetworkPlayers[attacker->playerIndex]);
+    }
+    if (cVictim == NULL) { cVictim = victim; }
+
+    // Force a valid attack interaction if the caller didn't supply one
+    if (!(interaction & INT_ANY_ATTACK)) {
+        interaction = INT_PUNCH; // safe default
+    }
+
+    // ---- Lua allow hook ----
+    bool allowAttack = true;
+    smlua_call_event_hooks(HOOK_ALLOW_PVP_ATTACK, attacker, cVictim, interaction, &allowAttack);
+    if (!allowAttack) {
+        return false;
+    }
+
+    // ---- Apply damage / knockback (same path as normal PvP) ----
+    if (victim->playerIndex == 0) {
+        victim->interactObj = attacker->marioObj;
+
+        if (interaction & INT_KICK) {
+            if (victim->action == ACT_FIRST_PERSON) {
+                raise_background_noise(2);
+                set_camera_mode(victim->area->camera, -1, 1);
+                victim->input &= ~INPUT_FIRST_PERSON;
+            }
+            set_mario_action(victim, ACT_FREEFALL, 0);
+        }
+
+        if (!(victim->flags & MARIO_METAL_CAP)) {
+            attacker->marioObj->oDamageOrCoinValue = determine_player_damage_value(attacker, interaction);
+            if (attacker->flags & MARIO_METAL_CAP) {
+                attacker->marioObj->oDamageOrCoinValue *= 2;
+            }
+        }
+    }
+
+    victim->invincTimer = max(victim->invincTimer, 3);
+    take_damage_and_knock_back(victim, attacker->marioObj);
+
+    if (gServerSettings.pvpType != PLAYER_PVP_REVAMPED || !(attacker->flags & MARIO_PUNCHING)) {
+        bounce_back_from_attack(attacker, interaction);
+    }
+
+    victim->interactObj = NULL;
+
+    // ---- Lua on-attack hook ----
+    smlua_call_event_hooks(HOOK_ON_PVP_ATTACK, attacker, victim, interaction);
+
+    return true;
+}
     if (victim->playerIndex == 0) {
         victim->interactObj = attacker->marioObj;
         if (interaction & INT_KICK) {

@@ -433,6 +433,12 @@ Useful for handling different types of player-object collisions, attacks, and ob
 |descriptionEnd| */
 u32 determine_interaction(struct MarioState *m, struct Object *o);
 
+/* |description|
+Runs the full HOOK_ALLOW_PVP_ATTACK - damage/knockback - HOOK_ON_PVP_ATTACK path.
+  Returns true if the attack was allowed and processed.
+|descriptionEnd| */
+bool trigger_pvp_attack(struct MarioState *attacker, struct MarioState *victim, u32 interaction);
+
 u32 process_interaction(struct MarioState *m, u32 interactType, struct Object *o, u32 (*interact_function)(struct MarioState *, u32 interactType, struct Object *));
 
 #endif // INTERACTION_H
