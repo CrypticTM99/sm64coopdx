@@ -1,0 +1,20 @@
+# First Lua Mod Guide
+
+This is a short walkthrough for making your first Lua mod in sm64coopdx.  
+We’ll start with the absolute basics and end with a working mod you can actually play.
+
+## 1. Where mods go
+
+You can put a single `.lua` file in either of these places:
+
+- The `mods` folder next to the game executable
+- The save location:
+  - Windows: `%appdata%/sm64coopdx/mods`
+  - Linux: `~/.local/share/sm64coopdx/mods`
+  - macOS: `~/Library/Application Support/sm64coopdx/mods`
+
+You can also just drag and drop the file onto the game window.
+
+If you want multiple scripts in one mod later, make a folder and put a `main.lua` inside it.
+
+-- I'll add more to this later, got busy with blender crap
